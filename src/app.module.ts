@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config'; // Add ConfigService here
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { AppController } from './app.controller';  // IMPORTANT
+import { AppService } from './app.service';        // IMPORTANT
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { DatabaseModule } from './database/database.module';
@@ -32,5 +34,7 @@ import { DatabaseModule } from './database/database.module';
     AuthModule,
     UsersModule,
   ],
+  controllers: [AppController],  // ← ADD THIS
+  providers: [AppService],       // ← ADD THIS
 })
 export class AppModule {}
