@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, MoreThan } from 'typeorm';
 import { User } from './users.entity';
 
 @Injectable()
@@ -41,8 +41,10 @@ export class UsersService {
       userId,
       {
         password: hashedPassword,
-        resetPasswordToken: null as any,
-        resetPasswordExpires: null as any,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+        otpCode: null,
+        otpExpires: null,
       }
     );
   }
@@ -69,9 +71,34 @@ export class UsersService {
     await this.usersRepository.update(
       userId, 
       {
-        resetPasswordToken: null as any,
-        resetPasswordExpires: null as any,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
       }
+    );
+  }
+
+  // NEW OTP METHODS
+  async setOtpCode(email: string, otpCode: string, otpExpires: Date): Promise<void> {
+    await this.usersRepository.update(
+      { email },
+      { otpCode, otpExpires }
+    );
+  }
+
+  async findByOtpCode(email: string, otpCode: string): Promise<User | null> {
+    return await this.usersRepository.findOne({
+      where: {
+        email,
+        otpCode,
+        otpExpires: MoreThan(new Date()), // OTP not expired
+      }
+    });
+  }
+
+  async clearOtpCode(email: string): Promise<void> {
+    await this.usersRepository.update(
+      { email },
+      { otpCode: null, otpExpires: null }
     );
   }
 }

@@ -33,9 +33,6 @@ export class AuthController {
   @HttpCode(200)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    return this.authService.resetPassword(
-      resetPasswordDto.token,
-      resetPasswordDto.newPassword
-    );
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }

@@ -12,21 +12,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     UsersModule,
     PassportModule,
     ConfigModule,
-    // Fixed JWT configuration without type errors
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_SECRET');
-        const expiresIn = configService.get<string>('JWT_EXPIRATION') || '1h';
-        
-        if (!secret) {
-          throw new Error('JWT_SECRET is not defined');
-        }
-        
         return {
-          secret,
+          secret: configService.get('JWT_SECRET') || 'default-secret-key',
           signOptions: {
-            expiresIn: expiresIn as any, // Type assertion to fix the issue
+            expiresIn: configService.get('JWT_EXPIRATION') || '1h',
           },
         };
       },

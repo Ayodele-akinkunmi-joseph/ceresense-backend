@@ -1,5 +1,5 @@
 import { IsString, IsEmail, MinLength, Matches, IsNotEmpty } from 'class-validator';
-import { Match } from '../../common/decorators/match.decorator';
+import { Match } from '../../auth/common/decorators/match.decorator';
 
 export class RegisterDto {
   @IsString()
@@ -19,7 +19,7 @@ export class RegisterDto {
   @IsNotEmpty()
   @MinLength(8)
   @Matches(/((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-    message: 'Password too weak',
+    message: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number or special character',
   })
   password: string;
 
