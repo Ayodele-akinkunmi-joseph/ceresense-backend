@@ -75,7 +75,7 @@ export class BlogController {
     
     // Handle file upload if provided
     if (file) {
-      coverImageUrl = this.fileUploadService.getFileUrl(file.filename);
+      coverImageUrl = this.fileUploadService.getFileUrl(file.filename, 'blog');
     }
 
     // Parse tags if they come as JSON string
@@ -115,7 +115,7 @@ export class BlogController {
     
     // Handle new file upload if provided
     if (file) {
-      coverImageUrl = this.fileUploadService.getFileUrl(file.filename);
+      coverImageUrl = this.fileUploadService.getFileUrl(file.filename, 'blog');
     }
 
     // Parse tags if they come as JSON string
@@ -173,7 +173,7 @@ export class BlogController {
     if (post.coverImage) {
       const filename = post.coverImage.split('/').pop();
       if (filename) {
-        this.fileUploadService.deleteFile(filename);
+        this.fileUploadService.deleteFile(filename, 'blog');
       }
     }
     
