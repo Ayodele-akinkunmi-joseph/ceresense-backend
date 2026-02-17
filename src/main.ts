@@ -7,7 +7,12 @@ async function bootstrap() {
   
   // Enable CORS for your frontend
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'], // Your React URLs
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'https://ceresense.com.ng',      
+      'https://www.ceresense.com.ng'   
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
