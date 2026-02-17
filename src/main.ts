@@ -5,13 +5,15 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Enable CORS for your frontend
+  // Enable CORS for your frontend - include both HTTP and HTTPS
   app.enableCors({
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      'https://ceresense.com.ng',      
-      'https://www.ceresense.com.ng'   
+      'http://ceresense.com.ng',      // ADD THIS - HTTP version
+      'https://ceresense.com.ng',      // HTTPS version
+      'http://www.ceresense.com.ng',   // ADD THIS - HTTP www version
+      'https://www.ceresense.com.ng'   // HTTPS www version
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
