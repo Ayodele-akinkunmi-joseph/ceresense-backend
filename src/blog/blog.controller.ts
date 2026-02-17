@@ -78,9 +78,9 @@ export class BlogController {
       coverImageUrl = this.fileUploadService.getFileUrl(file.filename, 'blog');
     }
 
-    // Parse tags if they come as JSON string
+    // IMPORTANT FIX: Check if tags is a string before parsing
     let tags = createBlogDto.tags;
-    if (typeof tags === 'string') {
+    if (tags && typeof tags === 'string') {
       try {
         tags = JSON.parse(tags);
       } catch {
@@ -92,7 +92,7 @@ export class BlogController {
     const blogData = {
       ...createBlogDto,
       coverImage: coverImageUrl,
-      tags,
+      tags, // This will now be either the original array or parsed array
     };
 
     return this.blogService.create(blogData, req.user);
@@ -118,9 +118,9 @@ export class BlogController {
       coverImageUrl = this.fileUploadService.getFileUrl(file.filename, 'blog');
     }
 
-    // Parse tags if they come as JSON string
+    // IMPORTANT FIX: Check if tags is a string before parsing
     let tags = updateBlogDto.tags;
-    if (typeof tags === 'string') {
+    if (tags && typeof tags === 'string') {
       try {
         tags = JSON.parse(tags);
       } catch {
