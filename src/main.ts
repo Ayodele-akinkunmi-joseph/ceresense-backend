@@ -1,36 +1,34 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
-  // Enable CORS for your frontend - include both HTTP and HTTPS
+  // Serve static files from uploads directory
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
+  
+  // Enable CORS
   app.enableCors({
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      'http://ceresense.com.ng',      // ADD THIS - HTTP version
-      'https://ceresense.com.ng',      // HTTPS version
-      'http://www.ceresense.com.ng',   // ADD THIS - HTTP www version
-      'https://www.ceresense.com.ng'   // HTTPS www version
+      'http://ceresense.com.ng',
+      'https://ceresense.com.ng',
+      'http://www.ceresense.com.ng',
+      'https://www.ceresense.com.ng'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
   
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-  
   const port = process.env.PORT || 4000;
   await app.listen(port);
   console.log(`🚀 Application is running on: http://localhost:${port}`);
+  console.log(`📁 Uploads served from: /uploads`);
 }
 bootstrap();
