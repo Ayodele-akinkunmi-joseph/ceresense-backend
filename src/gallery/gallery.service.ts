@@ -10,6 +10,8 @@ import { User } from '../users/users.entity';
 import { CreateGalleryDto } from './dto/create-gallery.dto';
 import { UpdateGalleryDto } from './dto/update-gallery.dto';
 import { FilterGalleryDto } from './dto/filter-gallery.dto';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class GalleryService {
@@ -177,15 +179,225 @@ export class GalleryService {
     };
   }
 
- async getCategoriesStats() {
-  const categories = Object.values(GalleryCategory);
-  const stats: { category: GalleryCategory; count: number }[] = []; // Add type annotation
+  async getCategoriesStats() {
+    const categories = Object.values(GalleryCategory);
+    const stats: { category: GalleryCategory; count: number }[] = [];
 
-  for (const category of categories) {
-    const count = await this.galleryRepository.count({ where: { category } });
-    stats.push({ category, count });
+    for (const category of categories) {
+      const count = await this.galleryRepository.count({ where: { category } });
+      stats.push({ category, count });
+    }
+
+    return stats;
   }
 
-  return stats;
-}
+  // NEW METHOD: Fix image extensions for existing records
+  async fixImageExtensions(): Promise<{
+    fixed: number;
+    notFound: number;
+    total: number;
+    details: Array<{ 
+      id: string; 
+      oldUrl: string; 
+      newUrl: string; 
+      status: string;
+      title?: string;
+    }>;
+  }> {
+    console.log('🔍 Starting image extension fix...');
+    
+    // Get all gallery items
+    const items = await this.galleryRepository.find();
+    console.log(`📸 Found ${items.length} images to check`);
+    
+    let fixed = 0;
+    let notFound = 0;
+    const details = [];
+
+    // Common image extensions to check
+    const extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    
+    // Possible upload directories to check
+    const possibleUploadDirs = [
+      path.join(process.cwd(), 'uploads', 'gallery'),
+      path.join(__dirname, '../../uploads/gallery'),
+      path.join('/app/uploads/gallery'), // For Docker/Render
+      path.join(process.cwd(), 'public', 'uploads', 'gallery'),
+    ];
+
+    for (const item of items) {
+      // Extract the UUID/filename from the current path
+      const currentPath = item.imageUrl || '';
+      const uuid = currentPath.split('/').pop(); // Gets dd23f84217b330dcb6d900179bc48e8f
+      
+      // Skip if no UUID found
+      if (!uuid) {
+        console.log(`⚠️ No filename found for item ${item.id}`);
+        details.push({
+          id: item.id,
+          oldUrl: currentPath,
+          newUrl: '',
+          status: 'error - no filename',
+          title: item.title
+        });
+        notFound++;
+        continue;
+      }
+      
+      // Check if it already has an extension
+      if (uuid.includes('.')) {
+        console.log(`⏭️ Skipping ${uuid} - already has extension`);
+        details.push({
+          id: item.id,
+          oldUrl: currentPath,
+          newUrl: currentPath,
+          status: 'skipped - already has extension',
+          title: item.title
+        });
+        continue;
+      }
+      
+      let found = false;
+      let foundPath = '';
+      
+      // Try each extension
+      for (const ext of extensions) {
+        const fileName = `${uuid}${ext}`;
+        
+        // Check each possible directory
+        for (const dir of possibleUploadDirs) {
+          const fullPath = path.join(dir, fileName);
+          
+          try {
+            if (fs.existsSync(fullPath)) {
+              found = true;
+              foundPath = fileName;
+              console.log(`✅ Found: ${fileName} at ${dir}`);
+              break;
+            }
+          } catch (err) {
+            // Ignore errors, just continue checking
+          }
+        }
+        
+        if (found) break;
+      }
+      
+      if (found && foundPath) {
+        // Update database with correct path including extension
+        const correctUrl = `/uploads/gallery/${foundPath}`;
+        item.imageUrl = correctUrl;
+        await this.galleryRepository.save(item);
+        
+        console.log(`✅ Fixed: ${uuid} → ${foundPath}`);
+        fixed++;
+        
+        details.push({
+          id: item.id,
+          oldUrl: currentPath,
+          newUrl: correctUrl,
+          status: 'fixed',
+          title: item.title
+        });
+      } else {
+        console.log(`❌ Not found: ${uuid} (no image file with common extensions)`);
+        notFound++;
+        
+        // Try to find any file that starts with this UUID
+        let alternativeFound = false;
+        
+        for (const dir of possibleUploadDirs) {
+          try {
+            if (fs.existsSync(dir)) {
+              const files = fs.readdirSync(dir);
+              const matchingFile = files.find(file => file.startsWith(uuid));
+              
+              if (matchingFile) {
+                const correctUrl = `/uploads/gallery/${matchingFile}`;
+                item.imageUrl = correctUrl;
+                await this.galleryRepository.save(item);
+                
+                console.log(`✅ Fixed (alternative): ${uuid} → ${matchingFile}`);
+                fixed++;
+                alternativeFound = true;
+                
+                details.push({
+                  id: item.id,
+                  oldUrl: currentPath,
+                  newUrl: correctUrl,
+                  status: 'fixed - alternative match',
+                  title: item.title
+                });
+                break;
+              }
+            }
+          } catch (err) {
+            // Ignore errors
+          }
+        }
+        
+        if (!alternativeFound) {
+          details.push({
+            id: item.id,
+            oldUrl: currentPath,
+            newUrl: '',
+            status: 'not found',
+            title: item.title
+          });
+        }
+      }
+    }
+    
+    const summary = {
+      fixed,
+      notFound,
+      total: items.length,
+      details
+    };
+    
+    console.log(`\n📊 Summary:`);
+    console.log(`   Fixed: ${fixed} images`);
+    console.log(`   Not found: ${notFound} images`);
+    console.log(`   Total: ${items.length} images`);
+    
+    return summary;
+  }
+
+  // Helper method to check if a file exists
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      return fs.existsSync(filePath);
+    } catch {
+      return false;
+    }
+  }
+
+  // Method to get the correct image URL for a gallery item
+  async getCorrectImageUrl(id: string): Promise<string> {
+    const gallery = await this.findOne(id);
+    
+    // If URL already has extension, return it
+    if (gallery.imageUrl.includes('.')) {
+      return gallery.imageUrl;
+    }
+    
+    // Try to find the file with extension
+    const uuid = gallery.imageUrl.split('/').pop();
+    if (!uuid) return gallery.imageUrl;
+    
+    const extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    
+    for (const ext of extensions) {
+      const testPath = path.join(process.cwd(), 'uploads', 'gallery', `${uuid}${ext}`);
+      if (await this.fileExists(testPath)) {
+        const correctUrl = `/uploads/gallery/${uuid}${ext}`;
+        // Update the database
+        gallery.imageUrl = correctUrl;
+        await this.galleryRepository.save(gallery);
+        return correctUrl;
+      }
+    }
+    
+    return gallery.imageUrl;
+  }
 }
