@@ -34,6 +34,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/common/decorators/roles.decorator';
 import { UserRole } from '../users/users.entity';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @ApiTags('Gallery')
 @Controller('gallery')
@@ -43,50 +45,53 @@ export class GalleryController {
     private readonly fileUploadService: FileUploadService,
   ) {}
 
- @Post()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.EDITOR)
-@UseInterceptors(FileInterceptor('image'))
-@ApiBearerAuth()
-@ApiConsumes('multipart/form-data')
-@ApiBody({
-  schema: {
-    type: 'object',
-    properties: {
-      title: { type: 'string' },
-      description: { type: 'string' },
-      category: { type: 'string', enum: Object.values(GalleryCategory) },
-      tags: { type: 'string' }, // Comma-separated string
-      featured: { type: 'boolean' },
-      date: { type: 'string' },
-      status: { type: 'string', enum: Object.values(GalleryStatus) },
-      image: {
-        type: 'string',
-        format: 'binary',
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.EDITOR)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: Object.values(GalleryCategory) },
+        tags: { type: 'string' },
+        featured: { type: 'boolean' },
+        date: { type: 'string' },
+        status: { type: 'string', enum: Object.values(GalleryStatus) },
+        image: {
+          type: 'string',
+          format: 'binary',
+        },
       },
     },
-  },
-})
-async create(
-  @UploadedFile() file: Multer.File,
-  @Body() createGalleryDto: CreateGalleryDto,
-  @Request() req,
-) {
-  console.log('Received file:', file?.filename);
-  console.log('Received DTO:', createGalleryDto);
-  console.log('Tags type:', typeof createGalleryDto.tags, 'Value:', createGalleryDto.tags);
-  console.log('Featured type:', typeof createGalleryDto.featured, 'Value:', createGalleryDto.featured);
+  })
+  async create(
+    @UploadedFile() file: Multer.File,
+    @Body() createGalleryDto: CreateGalleryDto,
+    @Request() req,
+  ) {
+    console.log('Received file:', file?.filename);
+    console.log('Received DTO:', createGalleryDto);
+    console.log('Tags type:', typeof createGalleryDto.tags, 'Value:', createGalleryDto.tags);
+    console.log('Featured type:', typeof createGalleryDto.featured, 'Value:', createGalleryDto.featured);
 
-  if (!file) {
-    throw new BadRequestException('Image file is required');
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    // Log the raw body for debugging
+    console.log('Raw tags:', createGalleryDto.tags);
+
+    // IMPORTANT FIX: Get the image URL which already includes extension
+    // because FileUploadService saves files with original extensions
+    const imageUrl = this.fileUploadService.getFileUrl(file.filename);
+    
+    return this.galleryService.create(createGalleryDto, imageUrl, req.user);
   }
-
-  // Log the raw body for debugging
-  console.log('Raw tags:', createGalleryDto.tags);
-
-  const imageUrl = this.fileUploadService.getFileUrl(file.filename);
-  return this.galleryService.create(createGalleryDto, imageUrl, req.user);
-}
 
   @Get()
   @ApiOperation({ summary: 'Get all gallery items with filtering' })
@@ -178,5 +183,20 @@ async create(
   @ApiBearerAuth()
   async toggleFeatured(@Param('id') id: string) {
     return this.galleryService.toggleFeatured(id);
+  }
+
+  // NEW ENDPOINT: Fix existing images with missing extensions
+  @Post('fix-extensions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Fix image extensions for existing records' })
+  async fixImageExtensions() {
+    const result = await this.galleryService.fixImageExtensions();
+    return {
+      success: true,
+      message: 'Image extension fix completed',
+      data: result
+    };
   }
 }
