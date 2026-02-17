@@ -1,4 +1,3 @@
-// src/blog/blog.controller.ts
 import {
   Controller,
   Get,
@@ -11,36 +10,131 @@ import {
   UseGuards,
   Request,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Multer } from 'multer';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { BlogService } from './blog.service';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
 import { FilterBlogDto } from './dto/filter-blog.dto';
-import { CreateCommentDto } from './dto/create-comment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/common/decorators/roles.decorator';
 import { UserRole } from '../users/users.entity';
+import { FileUploadService } from '../gallery/file-upload.service';
 
 @ApiTags('Blog')
 @Controller('blog')
 export class BlogController {
-  constructor(private readonly blogService: BlogService) {}
+  constructor(
+    private readonly blogService: BlogService,
+    private readonly fileUploadService: FileUploadService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.EDITOR)
+  @UseInterceptors(FileInterceptor('coverImage'))
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new blog post' })
-  async create(@Body() createBlogDto: CreateBlogDto, @Request() req) {
-    return this.blogService.create(createBlogDto, req.user);
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Create a new blog post with cover image' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        excerpt: { type: 'string' },
+        category: { type: 'string' },
+        tags: { type: 'string' },
+        readTime: { type: 'string' },
+        isPublished: { type: 'boolean' },
+        coverImage: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async create(
+    @UploadedFile() file: Multer.File,
+    @Body() createBlogDto: CreateBlogDto,
+    @Request() req,
+  ) {
+    let coverImageUrl = null;
+    
+    // Handle file upload if provided
+    if (file) {
+      coverImageUrl = this.fileUploadService.getFileUrl(file.filename);
+    }
+
+    // Parse tags if they come as JSON string
+    let tags = createBlogDto.tags;
+    if (typeof tags === 'string') {
+      try {
+        tags = JSON.parse(tags);
+      } catch {
+        tags = tags.split(',').map(tag => tag.trim());
+      }
+    }
+
+    // Create blog post with image URL
+    const blogData = {
+      ...createBlogDto,
+      coverImage: coverImageUrl,
+      tags,
+    };
+
+    return this.blogService.create(blogData, req.user);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.EDITOR)
+  @UseInterceptors(FileInterceptor('coverImage'))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update a blog post with optional new cover image' })
+  async update(
+    @Param('id') id: string,
+    @UploadedFile() file: Multer.File,
+    @Body() updateBlogDto: UpdateBlogDto,
+    @Request() req,
+  ) {
+    let coverImageUrl = updateBlogDto.coverImage;
+    
+    // Handle new file upload if provided
+    if (file) {
+      coverImageUrl = this.fileUploadService.getFileUrl(file.filename);
+    }
+
+    // Parse tags if they come as JSON string
+    let tags = updateBlogDto.tags;
+    if (typeof tags === 'string') {
+      try {
+        tags = JSON.parse(tags);
+      } catch {
+        tags = tags.split(',').map(tag => tag.trim());
+      }
+    }
+
+    const updateData = {
+      ...updateBlogDto,
+      coverImage: coverImageUrl,
+      tags,
+    };
+
+    return this.blogService.update(id, updateData, req.user);
   }
 
   @Get()
@@ -67,23 +161,22 @@ export class BlogController {
     return this.blogService.findOne(id);
   }
 
-  @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.EDITOR)
-  @ApiBearerAuth()
-  async update(
-    @Param('id') id: string,
-    @Body() updateBlogDto: UpdateBlogDto,
-    @Request() req,
-  ) {
-    return this.blogService.update(id, updateBlogDto, req.user);
-  }
-
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.EDITOR)
   @ApiBearerAuth()
   async remove(@Param('id') id: string, @Request() req) {
+    // Get the post to delete its cover image
+    const post = await this.blogService.findOne(id);
+    
+    // Delete the cover image file if it exists
+    if (post.coverImage) {
+      const filename = post.coverImage.split('/').pop();
+      if (filename) {
+        this.fileUploadService.deleteFile(filename);
+      }
+    }
+    
     return this.blogService.remove(id, req.user);
   }
 
@@ -91,37 +184,5 @@ export class BlogController {
   @ApiOperation({ summary: 'Like a blog post' })
   async likePost(@Param('id') id: string) {
     return this.blogService.incrementLikes(id);
-  }
-
-  // Comments Endpoints
-  @Post(':id/comments')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Add a comment to a blog post' })
-  async createComment(
-    @Param('id') postId: string,
-    @Body() createCommentDto: CreateCommentDto,
-    @Request() req,
-  ) {
-    return this.blogService.createComment(postId, createCommentDto, req.user);
-  }
-
-  @Get(':id/comments')
-  @ApiOperation({ summary: 'Get comments for a blog post' })
-  async getComments(@Param('id') postId: string) {
-    return this.blogService.getComments(postId);
-  }
-
-  @Post('comments/:id/like')
-  @ApiOperation({ summary: 'Like a comment' })
-  async likeComment(@Param('id') commentId: string) {
-    return this.blogService.likeComment(commentId);
-  }
-
-  @Delete('comments/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  async deleteComment(@Param('id') commentId: string, @Request() req) {
-    return this.blogService.deleteComment(commentId, req.user);
   }
 }
