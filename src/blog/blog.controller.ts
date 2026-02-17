@@ -72,27 +72,32 @@ export class BlogController {
     @Request() req,
   ) {
     let coverImageUrl = null;
-    
+
     // Handle file upload if provided
     if (file) {
       coverImageUrl = this.fileUploadService.getFileUrl(file.filename, 'blog');
     }
 
-    // IMPORTANT FIX: Check if tags is a string before parsing
+    // --- FIXED: Safely handle tags which might be a string or an array ---
     let tags = createBlogDto.tags;
+    // Only process if tags exists and is a string
     if (tags && typeof tags === 'string') {
       try {
+        // Try to parse as JSON first (in case it's a stringified array)
         tags = JSON.parse(tags);
       } catch {
+        // If JSON parsing fails, treat it as a comma-separated string
         tags = tags.split(',').map(tag => tag.trim());
       }
     }
+    // If tags is already an array, it's left untouched
+    // -------------------------------------------------------------------
 
     // Create blog post with image URL
     const blogData = {
       ...createBlogDto,
       coverImage: coverImageUrl,
-      tags, // This will now be either the original array or parsed array
+      tags, // This will now be either the original array or a parsed array
     };
 
     return this.blogService.create(blogData, req.user);
@@ -112,21 +117,26 @@ export class BlogController {
     @Request() req,
   ) {
     let coverImageUrl = updateBlogDto.coverImage;
-    
+
     // Handle new file upload if provided
     if (file) {
       coverImageUrl = this.fileUploadService.getFileUrl(file.filename, 'blog');
     }
 
-    // IMPORTANT FIX: Check if tags is a string before parsing
+    // --- FIXED: Safely handle tags which might be a string or an array ---
     let tags = updateBlogDto.tags;
+    // Only process if tags exists and is a string
     if (tags && typeof tags === 'string') {
       try {
+        // Try to parse as JSON first
         tags = JSON.parse(tags);
       } catch {
+        // If JSON parsing fails, treat it as a comma-separated string
         tags = tags.split(',').map(tag => tag.trim());
       }
     }
+    // If tags is already an array, it's left untouched
+    // -------------------------------------------------------------------
 
     const updateData = {
       ...updateBlogDto,
@@ -168,7 +178,7 @@ export class BlogController {
   async remove(@Param('id') id: string, @Request() req) {
     // Get the post to delete its cover image
     const post = await this.blogService.findOne(id);
-    
+
     // Delete the cover image file if it exists
     if (post.coverImage) {
       const filename = post.coverImage.split('/').pop();
@@ -176,7 +186,7 @@ export class BlogController {
         this.fileUploadService.deleteFile(filename, 'blog');
       }
     }
-    
+
     return this.blogService.remove(id, req.user);
   }
 
