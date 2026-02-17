@@ -6,25 +6,31 @@ import * as path from 'path';
 
 @Injectable()
 export class FileUploadService {
-  private readonly uploadDir = 'uploads/gallery';
+  private readonly baseUploadDir = 'uploads';
+  private readonly galleryDir = 'uploads/gallery';
+  private readonly blogDir = 'uploads/blog';
 
   constructor() {
-    // Create upload directory if it doesn't exist
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
+    // Create upload directories if they don't exist
+    [this.galleryDir, this.blogDir].forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    });
   }
 
-  getStorageConfig() {
+  getStorageConfig(type: 'gallery' | 'blog' = 'gallery') {
+    const targetDir = type === 'gallery' ? this.galleryDir : this.blogDir;
+    
     return {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          cb(null, this.uploadDir);
+          cb(null, targetDir);
         },
         filename: (req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = extname(file.originalname);
-          cb(null, `gallery-${uniqueSuffix}${ext}`);
+          cb(null, `${type}-${uniqueSuffix}${ext}`);
         },
       }),
       fileFilter: (req, file, cb) => {
@@ -53,30 +59,30 @@ export class FileUploadService {
     };
   }
 
-  getFileUrl(filename: string): string {
-    return `/uploads/gallery/${filename}`;
+  getFileUrl(filename: string, type: 'gallery' | 'blog' = 'gallery'): string {
+    return `/uploads/${type}/${filename}`;
   }
 
-  deleteFile(filename: string): void {
-    const filePath = path.join(this.uploadDir, filename);
+  deleteFile(filename: string, type: 'gallery' | 'blog' = 'gallery'): void {
+    const filePath = path.join(this.baseUploadDir, type, filename);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
   }
 
-  async saveBase64Image(base64Data: string): Promise<string> {
+  async saveBase64Image(base64Data: string, type: 'gallery' | 'blog' = 'gallery'): Promise<string> {
     try {
       // Remove data URL prefix if present
       const base64Image = base64Data.replace(/^data:image\/\w+;base64,/, '');
       
       const buffer = Buffer.from(base64Image, 'base64');
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      const filename = `gallery-${uniqueSuffix}.jpg`;
-      const filePath = path.join(this.uploadDir, filename);
+      const filename = `${type}-${uniqueSuffix}.jpg`;
+      const filePath = path.join(this.baseUploadDir, type, filename);
 
       await fs.promises.writeFile(filePath, buffer);
       
-      return this.getFileUrl(filename);
+      return this.getFileUrl(filename, type);
     } catch (error) {
       throw new BadRequestException('Failed to save base64 image');
     }
