@@ -191,13 +191,13 @@ export class GalleryService {
     return stats;
   }
 
-  // NEW METHOD: Fix image extensions for existing records
+  // FIXED: Image extension fix method with proper _id field
   async fixImageExtensions(): Promise<{
     fixed: number;
     notFound: number;
     total: number;
     details: Array<{ 
-      id: string; 
+      _id: string; 
       oldUrl: string; 
       newUrl: string; 
       status: string;
@@ -232,9 +232,9 @@ export class GalleryService {
       
       // Skip if no UUID found
       if (!uuid) {
-        console.log(`⚠️ No filename found for item ${item.id}`);
+        console.log(`⚠️ No filename found for item ${item._id}`);
         details.push({
-          id: item.id,
+          _id: item._id,
           oldUrl: currentPath,
           newUrl: '',
           status: 'error - no filename',
@@ -248,7 +248,7 @@ export class GalleryService {
       if (uuid.includes('.')) {
         console.log(`⏭️ Skipping ${uuid} - already has extension`);
         details.push({
-          id: item.id,
+          _id: item._id,
           oldUrl: currentPath,
           newUrl: currentPath,
           status: 'skipped - already has extension',
@@ -293,7 +293,7 @@ export class GalleryService {
         fixed++;
         
         details.push({
-          id: item.id,
+          _id: item._id,
           oldUrl: currentPath,
           newUrl: correctUrl,
           status: 'fixed',
@@ -322,7 +322,7 @@ export class GalleryService {
                 alternativeFound = true;
                 
                 details.push({
-                  id: item.id,
+                  _id: item._id,
                   oldUrl: currentPath,
                   newUrl: correctUrl,
                   status: 'fixed - alternative match',
@@ -338,7 +338,7 @@ export class GalleryService {
         
         if (!alternativeFound) {
           details.push({
-            id: item.id,
+            _id: item._id,
             oldUrl: currentPath,
             newUrl: '',
             status: 'not found',
