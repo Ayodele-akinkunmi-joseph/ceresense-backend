@@ -16,7 +16,7 @@ export class GalleryFixService {
     fixed: number;
     notFound: number;
     total: number;
-    details: Array<{ id: string; oldUrl: string; newUrl: string; status: string }>;
+    details: Array<{ _id: string; oldUrl: string; newUrl: string; status: string }>;
   }> {
     console.log('🔍 Starting image extension fix...');
     
@@ -37,7 +37,7 @@ export class GalleryFixService {
       if (uuid && uuid.includes('.')) {
         console.log(`⏭️ Skipping ${uuid} - already has extension`);
         details.push({
-          id: item.id,
+          _id: item._id, // FIXED: changed from item.id to item._id
           oldUrl: item.imageUrl,
           newUrl: item.imageUrl,
           status: 'skipped - already has extension'
@@ -72,7 +72,7 @@ export class GalleryFixService {
             found = true;
             
             details.push({
-              id: item.id,
+              _id: item._id, // FIXED: changed from item.id to item._id
               oldUrl: currentPath,
               newUrl: correctUrl,
               status: 'fixed'
@@ -88,7 +88,7 @@ export class GalleryFixService {
         console.log(`❌ Not found: ${uuid} (no image file with common extensions)`);
         notFound++;
         details.push({
-          id: item.id,
+          _id: item._id, // FIXED: changed from item.id to item._id
           oldUrl: currentPath,
           newUrl: '',
           status: 'not found'
