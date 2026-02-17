@@ -1,14 +1,20 @@
-// src/blog/blog.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MulterModule } from '@nestjs/platform-express';
 import { BlogController } from './blog.controller';
 import { BlogService } from './blog.service';
-import { BlogPost, Comment } from './blog.entity';
+import { BlogPost } from './blog.entity';
+import { FileUploadService } from '../gallery/file-upload.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BlogPost, Comment])],
+  imports: [
+    TypeOrmModule.forFeature([BlogPost]),
+    MulterModule.register({
+      dest: './uploads/blog', // Separate folder for blog images
+    }),
+  ],
   controllers: [BlogController],
-  providers: [BlogService],
+  providers: [BlogService, FileUploadService],
   exports: [BlogService],
 })
 export class BlogModule {}
